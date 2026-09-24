@@ -28,7 +28,7 @@ jobs:
   publish-docker:
     name: Publish
     needs: build
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name == 'none' }}
     uses: ./.github/workflows/_publish-docker.yml
     permissions:
       id-token: write
