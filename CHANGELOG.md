@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.37.7](https://github.com/fluidd-core/fluidd/compare/v1.37.6...v1.37.7) (2026-09-23)
+
+### Features
+
+* **i18n-ru:** Update Russian translations ([61e4448](https://github.com/fluidd-core/fluidd/commit/61e4448cd8ab9854d10832787c953c57edeea779))
+
 ## [1.37.6](https://github.com/fluidd-core/fluidd/compare/v1.37.5...v1.37.6) (2026-09-23)
 
 
