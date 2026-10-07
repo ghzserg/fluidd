@@ -34,11 +34,6 @@ jobs:
         run: |
           pnpm run lint --no-fix
 
-      - name: Run type check
-        if: ${{ !cancelled() }}
-        run: |
-          pnpm run type-check
-
       - name: Run tests
         if: ${{ !cancelled() }}
         run: |

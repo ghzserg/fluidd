@@ -36,7 +36,7 @@ export interface PromptDialog {
   footerButtons: PromptDialogButton[]
 }
 
-export type PromptDialogItem = PromptDialogItemText | PromptDialogItemButton
+export type PromptDialogItem = PromptDialogItemText | PromptDialogItemButton | PromptDialogItemButtonGroup
 
 export interface PromptDialogItemText {
   type: 'text';
@@ -45,6 +45,11 @@ export interface PromptDialogItemText {
 
 export interface PromptDialogItemButton extends PromptDialogButton {
   type: 'button';
+}
+
+export interface PromptDialogItemButtonGroup {
+  type: 'button_group';
+  buttons: PromptDialogItemButton[];
 }
 
 export interface PromptDialogButton {

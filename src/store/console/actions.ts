@@ -1,9 +1,11 @@
-import type { ActionTree } from 'vuex'
 import { Globals } from '@/globals'
 import type { ConsoleEntry, ConsoleFilter, ConsoleState, PromptDialogButton, PromptDialogItemButton, PromptDialogItemText } from './types'
 import type { RootState } from '../types'
 import { SocketActions } from '@/api/socketActions'
 import { takeRightWhile } from 'lodash-es'
+
+let isGroupActive = false
+let currentGroupButtons: PromptDialogItemButton[] = []
 
 export const actions = {
   /**
@@ -114,7 +116,25 @@ export const actions = {
 
       switch (type) {
         case 'begin':
+          isGroupActive = false
+          currentGroupButtons = []
           commit('setResetPromptDialog', param)
+          break
+
+        case 'button_group_start':
+          isGroupActive = true
+          currentGroupButtons = []
+          break
+
+        case 'button_group_end':
+          isGroupActive = false
+          if (currentGroupButtons.length > 0) {
+            commit('setPromptDialogItem', {
+              type: 'button_group',
+              buttons: [...currentGroupButtons]
+            })
+          }
+          currentGroupButtons = []
           break
 
         case 'text': {
@@ -130,28 +150,31 @@ export const actions = {
         case 'button': {
           const [text, command, color, hexcolor] = param.split('|')
 
-          const item: PromptDialogItemButton = {
-            type: 'button',
+          const buttonItem = {
+            type: 'button' as const,
             text,
             command,
             color: hexcolor ? '#' + hexcolor : color
           }
 
-          commit('setPromptDialogItem', item)
+          if (isGroupActive) {
+            currentGroupButtons.push(buttonItem)
+          } else {
+            commit('setPromptDialogItem', buttonItem)
+          }
           break
         }
 
         case 'footer_button': {
           const [text, command, color] = param.split('|')
 
-          const item: PromptDialogButton = {
+          const footerButtonItem: PromptDialogButton = {
             text,
             command,
             color
           }
 
-          commit('setPromptDialogFooterButton', item)
-
+          commit('setPromptDialogFooterButton', footerButtonItem)
           break
         }
 
