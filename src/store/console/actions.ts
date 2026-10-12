@@ -1,11 +1,23 @@
+import type { ActionTree } from 'vuex'
 import { Globals } from '@/globals'
 import type { ConsoleEntry, ConsoleFilter, ConsoleState, PromptDialogButton, PromptDialogItemButton, PromptDialogItemText } from './types'
 import type { RootState } from '../types'
 import { SocketActions } from '@/api/socketActions'
 import { takeRightWhile } from 'lodash-es'
+import { TinyColor } from '@ctrl/tinycolor'
 
-let isGroupActive = false
-let currentGroupButtons: PromptDialogItemButton[] = []
+// Any color TinyColor can parse is used as such, anything else is kept as a theme color name
+const parsePromptButtonColor = (color?: string) => {
+  if (!color) {
+    return undefined
+  }
+
+  const tinyColor = new TinyColor(color)
+
+  return tinyColor.isValid
+    ? tinyColor.toHexString()
+    : color
+}
 
 export const actions = {
   /**
@@ -113,33 +125,17 @@ export const actions = {
 
     if (parsedMessage) {
       const [, type, param] = parsedMessage
+      const { id } = payload
 
       switch (type) {
         case 'begin':
-          isGroupActive = false
-          currentGroupButtons = []
           commit('setResetPromptDialog', param)
-          break
-
-        case 'button_group_start':
-          isGroupActive = true
-          currentGroupButtons = []
-          break
-
-        case 'button_group_end':
-          isGroupActive = false
-          if (currentGroupButtons.length > 0) {
-            commit('setPromptDialogItem', {
-              type: 'button_group',
-              buttons: [...currentGroupButtons]
-            })
-          }
-          currentGroupButtons = []
           break
 
         case 'text': {
           const item: PromptDialogItemText = {
             type: 'text',
+            id,
             text: param
           }
 
@@ -147,34 +143,41 @@ export const actions = {
           break
         }
 
-        case 'button': {
-          const [text, command, color, hexcolor] = param.split('|')
+        case 'button_group_start':
+          commit('setPromptDialogButtonGroupStart')
+          break
 
-          const buttonItem = {
-            type: 'button' as const,
+        case 'button_group_end':
+          commit('setPromptDialogButtonGroupEnd', id)
+          break
+
+        case 'button': {
+          const [text, command, color] = param.split('|')
+
+          const item: PromptDialogItemButton = {
+            type: 'button',
+            id,
             text,
             command,
-            color: hexcolor ? '#' + hexcolor : color
+            color: parsePromptButtonColor(color)
           }
 
-          if (isGroupActive) {
-            currentGroupButtons.push(buttonItem)
-          } else {
-            commit('setPromptDialogItem', buttonItem)
-          }
+          commit('setPromptDialogItem', item)
           break
         }
 
         case 'footer_button': {
           const [text, command, color] = param.split('|')
 
-          const footerButtonItem: PromptDialogButton = {
+          const item: PromptDialogButton = {
+            id,
             text,
             command,
-            color
+            color: parsePromptButtonColor(color)
           }
 
-          commit('setPromptDialogFooterButton', footerButtonItem)
+          commit('setPromptDialogFooterButton', item)
+
           break
         }
 
