@@ -205,6 +205,7 @@ import {
   mdiArrowUpBold,
   mdiDockTop,
   mdiDockBottom,
+  mdiTagMultipleOutline,
 } from '@mdi/js'
 
 import {
@@ -279,8 +280,10 @@ export const Globals = Object.freeze({
     webcams: { name: 'webcam', dispatch: 'webcams/init' },
     jobQueue: { name: 'job_queue', dispatch: 'jobQueue/init' },
     spoolman: { name: 'spoolman', dispatch: 'spoolman/init' },
-    sensors: { name: 'sensor', dispatch: 'sensors/init' }
+    sensors: { name: 'sensor', dispatch: 'sensors/init' },
+    extensions: { name: 'extensions', dispatch: 'extensions/init' }
   },
+  MOONRAKER_AGENTS: {},
   // Ordered by weight.
   CONFIG_SERVICE_MAP: [
     { filename: 'moonraker.conf', service: 'moonraker', link: 'https://moonraker.readthedocs.io/en/latest/configuration/' },
@@ -520,6 +523,8 @@ export const Icons = Object.freeze({
   database: mdiDatabase,
   dockTop: mdiDockTop,
   dockBottom: mdiDockBottom,
+  featureType: mdiTagMultipleOutline,
+  speedometer: mdiSpeedometer,
   mmu: mdiMulticast,
   mmuEditTtgMap: mdiStateMachine,
   mmuEditGateMap: mdiDatabaseEdit,
