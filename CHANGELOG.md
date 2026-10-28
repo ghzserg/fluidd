@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.37.17](https://github.com/fluidd-core/fluidd/compare/v1.37.7...v1.37.17) (2026-10-16)
+
+### Features
+
+* **console:** add support for prompt action button grouping ([#1977](https://github.com/fluidd-core/fluidd/issues/1977)) ([4b18abe](https://github.com/fluidd-core/fluidd/commit/4b18abe486654a40618a261ed0b46047c0b6377c))
+
+
 ## [1.37.7](https://github.com/fluidd-core/fluidd/compare/v1.37.6...v1.37.7) (2026-10-16)
 
 ### Features
