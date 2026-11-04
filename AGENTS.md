@@ -60,7 +60,8 @@ export default class PrinterWidget extends Mixins(StateMixin) {
 - Use `wait` parameter for UI loading states: `wait: Waits.onPrintStart`
 - Wait constants defined in `src/globals.ts` (`Waits` object, ~90 operation types)
 - Real-time updates handled via store mutations from socket events
-- Auto-reconnect with configurable interval (`Globals.SOCKET_RETRY_DELAY`)
+- Auto-reconnect (`socketClient.ts`) retries forever, staying in `connecting`: exponential backoff from 1s, ±20% jitter, capped at 15s after the jitter (Fluidd is LAN-local with few clients, so retries are cheap and a long cap only delays noticing a printer is back), reset on open. A retry that comes due while the tab is hidden or the browser is offline is held instead of opened (`socket.retry` = `{ held: true }`), and resumes on `visibilitychange` / `online`. A pending retry fires immediately on `online`, when the tab becomes visible, or from `SocketDisconnected`'s Retry now button (`retryNow()`, a no-op without a pending or held retry). `socket.retry` = `{ at }` (epoch ms) is set only for waits of 5s or more (`RETRY_SHOW_AFTER`), and drives the button and the "Unable to connect to Moonraker. Retrying in X seconds..." countdown, so the first quick retries don't flicker them. While held, the button stays up and the message reads "Unable to connect to Moonraker.". `disconnected` is reached only for an empty URL or an `appInit` failure
+- Liveness uses one timer at a time, re-armed by any inbound frame (a JSON-RPC error counts): 10s of silence sends a `server.info` ping — unauthenticated sockets get no notifications, so only a ping produces traffic — then 10s more of silence replaces the socket. `socket.stalled` is true while that ping is outstanding (set by the ping timer, cleared by `clearSilenceTimer`, so any frame, `handleClose` or `close` resets it); `SocketStalledSnackbar` shows it over the main app only, as the connecting and login screens have their own state. The ping timer is not armed until `onopen`, since `send` throws while `CONNECTING`; the same 10s timer bounds a socket stuck in `CONNECTING`. The two stages are chained, not parallel, so timers that come due together after sleep or a frozen tab still give the ping its 10s. Every socket handler ignores events from a socket that is no longer `this.connection`
 - `RequestOptions.suppressError` (`boolean | (error: SocketError) => boolean`) skips the global `socket/onSocketError` toast for that request — the emit promise still rejects, callers still need a `catch`. A `code >= 500` is never suppressible (a 503 drives klippy recovery in `socket/onSocketError`), and a predicate that throws logs via consola and falls back to not suppressing. Narrow a caught rejection with `isSocketError` (`src/util/is-socket-error.ts`) — see `history/fetchMissingJobs` suppressing not-found errors from `serverHistoryGetJob`. Moonraker's JSON-RPC layer rewrites a 404 to `-32601` and a 401 to `-32602` (other codes pass through), so test with `isMoonrakerNotFoundError` / `isMoonrakerUnauthorizedError`, never the HTTP code. `is-socket-error.ts` owns `SocketError` and must stay import-free — `socketClient.ts` imports the store types, so pulling it into a spec drags the whole store into the vitest type-check project
 
 ### Component Registration
@@ -74,8 +75,8 @@ export default class PrinterWidget extends Mixins(StateMixin) {
 
 ### Build Toolchain
 
-- **Node.js 24** — pinned in `package.json` via `devEngines.runtime` `^24.11.0` with
-  `onFail: download` (engines: `^22.12.0 || ^24`). pnpm provisions it; there is no
+- **Node.js 26** — pinned in `package.json` via `devEngines.runtime` `^26.13.0` with
+  `onFail: download` (engines: `^24 || ^26`). pnpm provisions it; there is no
   `.node-version` file and Corepack is not used anywhere — the pnpm version itself is pinned
   the same way, through `devEngines.packageManager`. Setting `packageManager` **as well** is an
   error in pnpm 12 ("Cannot use both"), so the two fields are mutually exclusive
@@ -445,17 +446,20 @@ src/
 ## Dev Container
 
 - VSCode Dev Container (`.devcontainer/`) bundles a `docker-klipper-simulavr` container — real Klipper/Moonraker simulation on port 7125, Fluidd on port 8080
-- Base image is `ghcr.io/pnpm/pnpm:12` — pnpm's official image, Debian-based, carrying only the
-  pnpm binary (`PNPM_HOME=/pnpm`, `/pnpm/bin` on `PATH`); Node.js is downloaded by pnpm from
-  `devEngines.runtime` on first use. It **must stay glibc** — `typescript-native-bridge` ships a Go
-  `c-shared` NAPI bridge with glibc-only native packages (no `-musl` build), so on Alpine it fails
-  to load and segfaults even with `gcompat`
-- The image has no `node` user and runs as root, so the Dockerfile creates one (uid 1000, zsh) to
-  match `devcontainer.json`'s `remoteUser`, and `chown`s `/pnpm` to it — pnpm writes the downloaded
-  runtime and its global shims there
-- `pnpm add --global node@^24.11.0` in the Dockerfile is **load-bearing**: without a globally
-  installed `node` there is no shim for pnpm to dispatch from, and a bare `node` in the container is
-  simply "not found". With it, `node` inside the workspace runs the `devEngines.runtime` version
+- Base image is `mcr.microsoft.com/devcontainers/javascript-node:26`, Debian-based. It **must stay
+  glibc** — `typescript-native-bridge` ships a Go `c-shared` NAPI bridge with glibc-only native
+  packages (no `-musl` build), so on Alpine it fails to load and segfaults even with `gcompat`
+- The image ships Node.js, pnpm, git, zsh, Oh My Zsh and the `node` user (uid 1000) that
+  `devcontainer.json`'s `remoteUser` names, so there is no Dockerfile — `docker-compose.yml` uses the
+  image directly. The image defaults to `root`, and `remoteUser` only covers VS Code and lifecycle
+  commands, so the service also sets `user: node` and `working_dir`; a root `pnpm i` from
+  `docker compose exec` would leave files `node` cannot write. A fresh `node_modules` named volume is
+  root-owned, so `postCreateCommand` starts with `sudo chown node:node node_modules` (idempotent, not
+  recursive). pnpm's store lands inside that volume (`node_modules/.pnpm-store`), so hard links work
+  and it survives rebuilds
+- The image's pnpm switches to `devEngines.packageManager` inside the project. A bare `node` is the
+  image's own version, which can lag the pin; anything run through pnpm or `node_modules/.bin` uses
+  `devEngines.runtime`
 - `postCreateCommand` runs `pnpm i --frozen-lockfile` automatically (which in turn runs `prepare`)
 
 ## Docker Images (production)
@@ -471,7 +475,9 @@ src/
 - **`[project.markdown_extensions]` REPLACES Zensical's `DEFAULT_MARKDOWN_EXTENSIONS`, it does not merge with them** (`config.get("markdown_extensions", DEFAULTS)` in `zensical/config.py`). Anything omitted from that table is off, including `toc.permalink` — dropping an entry silently removes heading anchors sitewide. Keep it in sync with `zensical/bootstrap/zensical.toml` in the installed package
 - `pymdownx.tabbed` carries `combine_header_slug` + `slugify`, so a content tab is linkable as `#<enclosing-heading>-<tab-label>` (e.g. `#thumbnails-orcaslicer`). Replacing a heading with a tab changes its anchor — preserve the old one with an **anchor redirect** in `[project.plugins.redirects.redirect_maps]` (`"page.md#old" = "page.md#new"`, Zensical 0.0.61+), which lands in `site/redirect.json`
 - `llmstxt` emits `llms.txt` / `llms-full.txt` plus a per-page `index.md` (backing the `content.action.copy` button) — it only includes pages matched by its `sections`, so a new top-level page must be added there too
-- `social` generates Open Graph cards; its default layout crashes on our palette (no `primary` set), so `cards_layout_options` must keep passing `background_color` and `color`. It fetches fonts from Google Fonts at build time
+- `social` generates Open Graph cards; our palette sets no `primary`, so `cards_layout_options` passes `background_color` and `color` (the square logo needs the dark background). It fetches fonts from Google Fonts at build time
+- `privacy` self-hosts external assets under `site/assets/external/`, restricted by an **`assets_include` allow-list** (Google Fonts, glightbox). Don't switch it to exclusions: the theme bundle references unused lazy libraries (pyodide, ace, mermaid, plyr, vimeo), and plyr's pull in Google ad SDKs that fail the `--strict` build. Unlisted URLs, like the Weblate badge, stay external
+- `optimize` is deliberately not enabled — it shells out to `pngquant`, which would become a requirement for every local `zensical serve`, and TOML config has no `!ENV` to enable it in CI only
 - Internal links are **relative `.md` paths** (`printing.md#thumbnails`, `../configuration.md`), never site-absolute — Zensical's `invalid_links` / `invalid_link_anchors` validation cannot resolve `/features/printing`, so absolute links are silently unchecked. Image paths stay site-absolute (`/assets/images/…`)
 - Content: `docs/docs/` — Markdown files with YAML frontmatter
 - Overrides: `docs/overrides/` — custom Jinja2 templates (header, htmltitle)
