@@ -1106,6 +1106,7 @@ app:
     LaneLoadedNone: НЕТ
     Printing: Печать
     PrintStartDialog:
+      AutoMap: Автоподбор
       StartJob: Запустить задачу
       NoFilamentLoaded: Филамент не загружен в {lane}
       Question: Начать печать {filename}?
