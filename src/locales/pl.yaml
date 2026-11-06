@@ -1445,6 +1445,8 @@ app:
     Initialized: Zainicjalizowano
     ManualEntry: Wpis ręczny
     PrintStartDialog:
+      AutoPa: Auto PA
+      Leveling: Siatka stołu
       StartJob: Rozpocznij zadanie
       Title: Przypisanie torów AFC
       NoLane: Brak toru

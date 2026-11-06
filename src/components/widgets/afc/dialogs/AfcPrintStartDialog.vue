@@ -41,6 +41,7 @@
         :class="{ 'border-top': index > 0 }"
       />
     </v-card-text>
+    <afc-print-start-dialog-zmod />
 
     <template #actions>
       <app-btn
@@ -96,7 +97,8 @@ const hexToLab = (hex: string): [number, number, number] => {
 }
 @Component({
   components: {
-    AfcPrintStartDialogTool: () => import('./AfcPrintStartDialogTool.vue')
+    AfcPrintStartDialogTool: () => import('./AfcPrintStartDialogTool.vue'),
+    AfcPrintStartDialogZmod: () => import('./AfcPrintStartDialogZmod.vue')
   }
 })
 export default class AfcPrintStartDialog extends Mixins(StateMixin, AfcMixin, FilesMixin) {

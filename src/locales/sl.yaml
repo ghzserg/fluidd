@@ -1455,6 +1455,8 @@ app:
     WeightRemaining: preostalo še {weight} g
     WeightUsed: porabljeno {weight} g
     PrintStartDialog:
+      AutoPa: Auto PA
+      Leveling: Mreža mize
       StartJob: Začni opravilo
       Title: Dodelitev prog AFC
       NoLane: Ni proge

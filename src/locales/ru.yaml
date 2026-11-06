@@ -1106,6 +1106,8 @@ app:
     LaneLoadedNone: НЕТ
     Printing: Печать
     PrintStartDialog:
+      AutoPa: Авто PA
+      Leveling: Карта стола
       AutoMap: Автоподбор
       StartJob: Запустить задачу
       NoFilamentLoaded: Филамент не загружен в {lane}

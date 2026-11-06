@@ -47,6 +47,8 @@ app:
     PrepDetected: "Filament detected but not loaded"
     Printing: "Printing"
     PrintStartDialog:
+      AutoPa: "Auto PA"
+      Leveling: "Bed mesh"
       AutoMap: "Auto-map"
       StartJob: "Start Job"
       Title: "AFC Lane Assignment"

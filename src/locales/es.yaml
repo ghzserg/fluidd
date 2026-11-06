@@ -681,6 +681,8 @@ app:
     PrepDetected: Filamento detectado pero no cargado
     Printing: Imprimiendo
     PrintStartDialog:
+      AutoPa: Auto PA
+      Leveling: Malla de cama
       StartJob: Empezar trabajo
       SpoolWeightRemaining: '{remaining}g restante ({used}g utilizado)'
       Question: ¿Quieres empezar a imprimir {filename}?
