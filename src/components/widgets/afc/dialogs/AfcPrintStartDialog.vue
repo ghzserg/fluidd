@@ -210,9 +210,24 @@ export default class AfcPrintStartDialog extends Mixins(StateMixin, AfcMixin, Fi
     }
   }
 
+  // Z-Mod: slot per used tool from lane.map ("2,,1"), passed to printer.print.start as tools
+  get zmodTools (): string | undefined {
+    if (this.$typedState.printer.printer.zmod_color == null || !this.usedTools.length) return undefined
+
+    const slots: string[] = Array(Math.max(...this.usedTools) + 1).fill('')
+    for (const tool of this.usedTools) {
+      const lane = this.afcLanes.find(lane => {
+        const map = this.getAfcLaneObject(lane)?.map
+        return (Array.isArray(map) ? map : [map]).some(t => t?.toLowerCase() === `t${tool}`)
+      })
+      slots[tool] = lane?.replace(/\D/g, '') ?? ''
+    }
+    return slots.join(',')
+  }
+
   handlePrint () {
     if (this.filename) {
-      SocketActions.printerPrintStart(this.filename)
+      SocketActions.printerPrintStart(this.filename, undefined, this.zmodTools)
 
       if (this.$route.name !== 'home') {
         this.$router.push({ name: 'home' })

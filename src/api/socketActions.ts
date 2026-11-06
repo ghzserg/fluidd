@@ -365,12 +365,13 @@ export const SocketActions = {
     )
   },
 
-  printerPrintStart (path: string, options?: RequestOptions) {
+  printerPrintStart (path: string, options?: RequestOptions, tools?: string) {
     return baseEmit(
       'printer.print.start', {
         ...options,
         params: {
-          filename: path
+          filename: path,
+          ...(tools ? { tools } : {})
         }
       }
     )
