@@ -49,7 +49,7 @@
         <v-tooltip top>
           <template #activator="{ on, attrs }">
             <v-btn
-              :disabled="toolLoaded || (!laneRunout && toolLoaded)"
+              :disabled="printerPrinting || toolLoaded || (!laneRunout && toolLoaded)"
               dense
               class="flex-grow-1 px-0 last-btn"
               v-bind="attrs"

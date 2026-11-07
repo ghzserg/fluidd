@@ -73,7 +73,7 @@
           v-if="afcZmod"
           class="font-weight-bold"
         >
-          {{ name.toUpperCase() }}
+          {{ afcLaneLabel(name).toUpperCase() }}
         </span>
         <span class="font-weight-bold">
           {{ spoolMaterial || '--' }}

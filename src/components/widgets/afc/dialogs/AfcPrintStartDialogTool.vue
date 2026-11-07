@@ -111,7 +111,7 @@
               class="text-subtitle-1 font-weight-bold text-uppercase"
               style="padding-right: 10px;"
             >
-              {{ laneName }}
+              {{ afcLaneLabel(laneName) }}
             </span>
             <v-chip
               v-if="laneFilament.color"
@@ -211,7 +211,7 @@
                       class="mr-2"
                       style="min-width: 0; width: 16px; height: 16px; padding: 0;"
                     />
-                    <span class="text-uppercase font-weight-bold mr-2">{{ option.lane }}</span>
+                    <span class="text-uppercase font-weight-bold mr-2">{{ afcLaneLabel(option.lane) }}</span>
                     <span class="text--secondary text-body-2 mr-1">{{ option.material }}</span>
                     <span
                       v-if="option.weight > 0"

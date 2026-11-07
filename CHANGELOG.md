@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
-## [1.37.21](https://github.com/fluidd-core/fluidd/compare/v1.37.7...v1.37.21) (2026-10-16)
+## [1.37.22](https://github.com/fluidd-core/fluidd/compare/v1.37.7...v1.37.22) (2026-10-16)
 
 ### Features
 

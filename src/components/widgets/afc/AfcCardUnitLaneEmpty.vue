@@ -9,7 +9,7 @@
           v-if="afcZmod"
           class="font-weight-bold"
         >
-          {{ name.toUpperCase() }}
+          {{ afcLaneLabel(name).toUpperCase() }}
         </div>
         {{ text }}
       </v-col>
@@ -22,6 +22,7 @@
         <v-tooltip top>
           <template #activator="{ on, attrs }">
             <v-btn
+              :disabled="printerPrinting"
               dense
               small
               class="fill-width elevation-0"
