@@ -50,7 +50,7 @@
       </v-col>
       <v-col class="pr-6 pl-2 pt-0 pb-0 d-flex flex-column justify-space-between align-end">
         <v-btn
-          v-if="afcShowLaneInfinite"
+          v-if="afcShowLaneInfinite && !afcZmod"
           x-small
           @click="showInfintiyDialog = true"
         >
@@ -69,6 +69,12 @@
           v-model="showInfintiyDialog"
           :name="name"
         />
+        <span
+          v-if="afcZmod"
+          class="font-weight-bold"
+        >
+          {{ name.toUpperCase() }}
+        </span>
         <span class="font-weight-bold">
           {{ spoolMaterial || '--' }}
         </span>

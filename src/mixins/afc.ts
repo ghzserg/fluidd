@@ -12,6 +12,11 @@ export default class AfcMixin extends Vue {
     return this.$typedState.printer.printer.AFC
   }
 
+  // Z-Mod AFC emulation: no lane mapping header and infinite spool button, lane name instead
+  get afcZmod (): boolean {
+    return this.$typedState.printer.printer.zmod_color != null
+  }
+
   get afcExtruders (): string[] {
     return this.afc?.extruders ?? []
   }

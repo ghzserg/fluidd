@@ -5,6 +5,12 @@
         class="align-content-center text-center text--disabled px-6"
         :class="{ 'pb-6': !prep, 'pt-3': !prep }"
       >
+        <div
+          v-if="afcZmod"
+          class="font-weight-bold"
+        >
+          {{ name.toUpperCase() }}
+        </div>
         {{ text }}
       </v-col>
     </v-row>

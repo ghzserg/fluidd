@@ -3,7 +3,10 @@
     class="grey flex-grow-1 afc-unit-lane d-flex flex-column"
     :class="laneStatusClass"
   >
-    <afc-card-unit-lane-header :name="name" />
+    <afc-card-unit-lane-header
+      v-if="!afcZmod"
+      :name="name"
+    />
     <template v-if="laneReady">
       <afc-card-unit-lane-body :name="name" />
       <afc-card-unit-lane-actions :name="name" />
