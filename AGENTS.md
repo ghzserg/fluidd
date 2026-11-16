@@ -54,7 +54,7 @@ export default class PrinterWidget extends Mixins(StateMixin) {
 - Generic results (`server.database.*_item`, `server.spoolman.proxy`, `server.extensions.request`) are `unknown` in the map; narrow at the call site with `baseEmit<'method', Narrower>(…)` — `Narrower` must extend the map's result
 - Dispatched handlers type their payload as `ObjectWithRequest<'method'>`, which types both the result and `__request__.params` (optional params may be `undefined`; default them to Moonraker's documented defaults). A string result is dispatched as `{ result }`
 - `Moonraker.Notifications` maps each JSON-RPC notification Fluidd handles to its params tuple (`undefined` when Moonraker sends none — it omits `params` entirely), merged per `moonraker.*.d.ts` like `Methods`. `socketClient.ts` dispatches `socket/<camelCase(method)>` with the **first** param only (`notify_status_update` excepted: it is cached and flushed every second, using its `eventtime`); the `socket/` handlers type it as `Moonraker.NotificationPayload<'notify_…'>` (so they follow the map; helpers: `Moonraker.Notification`, `NotificationPayload<N>`, `NotificationAction<N>` — the `socket/` action name, via `TSHelpers.SnakeToCamelCase`), while the module actions they forward to name the concrete type — both spellings are intentional. `CheckedNotificationHandlers` (`src/store/socket/actions.ts`) fails type-check, naming the handler, when an entry has no `socket/` action; `CheckedNotifications` (`socketClient.ts`) checks the entry shape. Notifications outside the map (`notify_sudo_alert`, `notify_button_event`, …) still reach `dispatch` and are dropped as unknown actions
-- Moonraker agents: the `extensions` module holds connected agents, updated by `notify_agent_event`'s reserved `connected` / `disconnected` events; every agent event, reserved ones included, is then routed to the matching `Globals.MOONRAKER_AGENTS` entry's `eventDispatch`. `extensions/onExtensionsList` also sends each listed agent's `eventDispatch` a synthesized `connected` event, so an agent that connected before Fluidd listed the agents (or before a reconnect) is seen the same way as one connecting live. Symmetrically, `extensions/reset` (socket drop, instance switch) sends each known agent's `eventDispatch` a synthesized `disconnected` before clearing the list. No deduplication is done — a live `connected` can race the list, so agent handlers must be idempotent for repeated `connected` / `disconnected`. `Extensions.AgentEvent`'s catch-all `event: string` defeats discriminant narrowing — narrow with type predicates
+- Moonraker agents: the `extensions` module holds connected agents, updated by `notify_agent_event`'s reserved `connected` / `disconnected` events; every agent event, reserved ones included, is then routed to the matching `Globals.MOONRAKER_AGENTS` entry's `eventDispatch`. `extensions/onExtensionsList` also sends each listed agent's `eventDispatch` a synthesized `connected` event, so an agent that connected before Fluidd listed the agents (or before a reconnect) is seen the same way as one connecting live. Symmetrically, `extensions/reset` (socket drop, instance switch) sends each known agent's `eventDispatch` a synthesized `disconnected` before clearing the list. No deduplication is done — a live `connected` can race the list, so agent handlers must be idempotent for repeated `connected` / `disconnected`. An agent reacts to its own `connected` / `disconnected` there — entries carry no separate init or teardown dispatch, only an optional `klippyDispatch` (run when `server/onServerInfo` sees `klippy_state` change, and on `notify_klippy_disconnected`). `Extensions.AgentEvent`'s catch-all `event: string` defeats discriminant narrowing — narrow with type predicates
 - Payload types used **only** by notifications end in `Event`, named after the notification with the namespace prefix dropped (`notify_job_queue_changed` → `JobQueue.ChangedEvent`, `notify_proc_stat_update` → `ProcStats.UpdateEvent`). A type shared with a method result keeps its `Response` name. `*Event` types are standalone interfaces — declare every field, never `extends`/alias/`Pick` a `Response`, even when the shape matches (`Announcements.DismissedEvent` vs `DismissResponse`). `Authorization.UserEvent` is the one content-named exception, shared by the three user notifications
 - `notify_user_logged_out` / `notify_user_deleted` are broadcast to every client, but Moonraker only de-authenticates that user's connections — `auth/onUserLoggedOut` and `auth/onUserDeleted` log out only when the `username` is the current user. `access.get_user` answers `{ username: null, … }` for a connection with no user; `auth/setCurrentUser` stores that as `null`. `auth.currentUser` and `auth.users` are `AppUser` (`src/store/auth/types.ts`, no `created_on`): neither the `access.login` response nor `notify_user_created` carries it. `notify_user_created` only fires for users created through the API, which Moonraker restricts to the `moonraker` source, so `setAddUser` sets that `source` itself
 - Use `wait` parameter for UI loading states: `wait: Waits.onPrintStart`
@@ -169,8 +169,9 @@ src/
 - Parsed in `src/workers/parseGcode.worker.ts` → `parseGcode.ts` — streamed via `fetch` +
   `ReadableStream`, reporting progress by file position
 - Result is a **columnar `MoveStore`** of typed arrays, not `Move` objects (`src/store/gcodePreview/types.ts`):
-  `x`/`y`/`z`/`i`/`j` `Float32Array`, `tool`/`flags`/`role`/`fan` `Uint8Array`, `speed` `Uint16Array`,
-  `filePosition` `Uint32Array`, plus a `length` — every column is indexed by the same move index
+  `x`/`y`/`z`/`i`/`j` `Float32Array`, `tool`/`flags`/`role`/`fan` `Uint8Array`, `speed`/`temp`
+  `Uint16Array`, `filePosition` `Uint32Array`, plus a `length` — every column is indexed by the
+  same move index
 - `role` is an `ExtrusionRole` (PrusaSlicer's 15-role enum, Brim folded into Skirt), sticky from the
   last role comment. `src/workers/gcode-extrusion-roles.ts` merges per-slicer tag lists, taken from
   each slicer's source, into one case-insensitive dictionary — no slicer detection. A spec
@@ -182,15 +183,26 @@ src/
 - `fan` is the sticky part cooling fan as the raw **`M106 S` value (0–255)**, with Klipper's
   `M106` semantics: a missing `S` is 255, `P` is ignored, `M107` is 0; `SET_FAN_SPEED` only drives
   `[fan_generic]`, so it is ignored
-- The result also carries `roles` (sorted distinct roles of extruding moves) plus `speedRange` and
-  `fanRange` (`ValueRange`: min/max over extruding moves, whole file — keeps the legends stable
-  across layers — plus PrusaSlicer's `count`, exact only up to 2 distinct values)
+- `temp` is the nozzle target of the current tool's **heater**, in whole **°C**, starting at 0 (a
+  real 0, not "unknown" — there is no unknown group). Temperatures are stored per heater
+  (`heaterTemps`), and each tool is mapped to one on first use (`toolHeaters`): a temperature
+  command naming tool `n` first — `M104`/`M109` `S` with `T<n>` (default the current tool), or
+  `SET_HEATER_TEMPERATURE HEATER=extruder[N]` — gives it heater `n`; switching to an unmapped tool
+  (`T<n>`, or `M600`, which fakes a tool change) makes it **share the current tool's heater**, as
+  MMU lanes share one extruder. So a temperature set on the shared heater applies to every lane.
+  A missing `TARGET` is 0, like Klipper; other heaters are ignored. There is no seeding from file
+  metadata
+- The result also carries `roles` (sorted distinct roles of extruding moves) plus `speedRange`,
+  `fanRange` and `tempRange` (`ValueRange`: min/max over extruding moves, whole file — keeps the
+  legends stable across layers — plus PrusaSlicer's `count`, exact only up to 2 distinct values)
 - `x`/`y`/`z` are **forward-filled** absolute positions after each move — there are no `undefined`
   axes to fall back through
 - `i`/`j` are arc centre offsets, **truncated after the last `Arc` move** — only read them when
   that move has the `Arc` flag set
 - `MoveFlags` is a bit field: `Extruding`, `Retracting`, `Arc`, `Clockwise` — test with
-  `(flags[i] & MoveFlags.Arc) !== 0`
+  `(flags[i] & MoveFlags.Arc) !== 0`. Like PrusaSlicer, `Extruding` needs E to increase **and**
+  X/Y to change (or an arc): an E-only move (a prime, `G11`) or a Z-only one is not an extrusion,
+  so it stays out of `roles` and the ranges — a slow prime would otherwise drag `speedRange` down
 - The worker **transfers** the `MoveStore` buffers via `postMessage` transferables rather than
   copying them; the parser owns nothing afterwards. `defaultMoveStore` (`gcodePreview/state.ts`) is
   the empty store used on reset
@@ -201,14 +213,15 @@ src/
   `getPaths` getter, which now just delegates). Every emitted `d` **must** start with a moveto — a
   `d` beginning with `L` or `A` renders nothing
 - `LayerPaths.extrusions` is keyed by colour group, chosen by `colorBy`
-  (`uiSettings.gcodePreview.colorMode`): `T<tool>`, `R<role>`, `S<bucket>` or `F<bucket>`, where
+  (`uiSettings.gcodePreview.colorMode`): `T<tool>`, `R<role>`, `S<bucket>`, `F<bucket>` or
+  `C<bucket>` (temperature — `T` is taken by tools), where
   `rangeBucket` rounds to the nearest of the 11 evenly spaced `rangeColors` stops over
-  `speedRange` / `fanRange`, using PrusaSlicer's range palette. The legends list the stop values
-  like PrusaSlicer's (mm/s, and percent for the fan), or just the values when there are 1 or 2
-  distinct ones. Colours come from
+  `speedRange` / `fanRange` / `tempRange`, using PrusaSlicer's range palette. The legends list the
+  stop values like PrusaSlicer's (mm/s, percent for the fan, °C for temperature), or just the
+  values when there are 1 or 2 distinct ones. Colours come from
   `gcodePreview/getExtrusionColors`; only the current layer is coloured, the other layers stay grey
 - There is no colour-mode fallback: a file without role tags or extruding moves draws in one
-  colour (`R0` / `S0` / `F0`) with an empty legend
+  colour (`R0` / `S0` / `F0` / `C0`) with an empty legend
 - Oversized files are truncated by the parser, which sets `truncated` on the result;
   `gcodePreview/actions.ts` surfaces it as an `EventBus` warning
   (`app.general.msg.gcode_preview_truncated`)
@@ -385,7 +398,8 @@ src/
   element (`AppInlineChart` → `app-inline-chart`), with BEM `__element` classes for inner parts
   (`app-inline-chart__label`). Their scoped styles target these classes, not Vuetify's
 - Any link opening a new tab (`target="_blank"`) **must** also set `rel="noopener noreferrer"` — applies to `<a>`, `<v-btn>`/`<app-btn>` with `:href`, and any HTML strings rendered via `v-safe-html` (e.g. `src/util/html-helpers.ts`)
-- Render plain text as plain text: `<span class="text-pre-wrap">{{ value }}</span>`, on one line so `pre-wrap` does not reveal template whitespace, and not `v-text` (lint rejects it on components). `v-safe-html` parses its input as HTML, so `<none>` disappears and an unterminated `<min` loses the rest of the string; keep it for strings that really carry markup. Store raw newlines, never `<br>` — `server.info` is sent `raw` so Moonraker's warnings arrive that way too — and put real newlines in locale strings rendered as plain text
+- Render plain text as plain text: `<span class="text-pre-wrap">{{ value }}</span>`, on one line so `pre-wrap` does not reveal template whitespace, and not `v-text` (lint rejects it on components). `v-safe-html` parses its input as HTML, so `<none>` disappears and an unterminated `<min` loses the rest of the string; keep it for strings that really carry markup. The form controls (`AppNamedSwitch`/`Select`/`Slider`/`TextField`), `StatusLabel` and `CollapsableCard`'s `subTitle` render plain text; markup in a label goes in their `label` slot instead, which makes the `label` prop optional (`OutputFan` uses `AppNamedSlider`'s for the RPM in `<small>`). `AppInlineHelp` tooltips, `AppDragOverlay` messages and the `ExtruderStats` strings stay HTML, as their locale strings use `<br>`, `<kbd>`, `<strong>` and `<span>`. Store raw newlines, never `<br>` — `server.info` is sent `raw` so Moonraker's warnings arrive that way too — and put real newlines in locale strings rendered as plain text
+- `AppNamedSelect`, `AppNamedSlider` and `AppNamedTextField` lay out their label and input through `AppNamedContainer` (`src/components/ui/`), which owns the label column (`cols="12" sm="5"`, `text--disabled`, the plain-text fallback). `AppNamedSwitch` does not use it — its label-left, switch-right row has no column split. Each control keeps `inheritAttrs: false` and binds `$attrs` to its input; the container does not, so attributes set on it land on its `v-row`. A control forwards its `label` slot only when given one — `<template v-if="$scopedSlots.label" #label><slot name="label" /></template>` — so the container's fallback renders from the prop otherwise; use `$scopedSlots`, as a `v-slot` slot is not always in `$slots`
 - `src/util/html-helpers.ts` (import-free) builds HTML from plain text: `linkExternalUrls` escapes everything except the anchors it generates, which is why `AppWarnings` can stay on `v-safe-html` without losing text. `escapeHtml` escapes `&`, `<`, `>`, `"` and `'`, so its output is safe in text and quoted attribute values
 - `v-safe-html` (`src/directives/safe-html.ts`) sanitizes to a DOM fragment with `sanitizeHtml` (`src/util/sanitize-html.ts`, which owns the DOMPurify config and its hooks: an `<a>` (HTML or SVG, matched by `localName`, reading `href` or `xlink:href`) whose `href` names its own `http(s)` host is forced to `target="_blank"` — decided by resolving it with `new URL` against a dummy `http://relative.invalid/` base, not a regex, so backslash, tab and slash-less forms (`\\x.com`, `https:x.com`) the browser treats as external are caught — an author's `target="_blank"` is kept on any `<a>`, and every `_blank` link gets `noopener` and `noreferrer` added to its `rel`, so macro HTML can't skip them. Links without `href` (`ConsoleItem`'s command links), relative, hash, `mailto:` and `tel:` links keep the same tab) and inserts it with `replaceChildren`, never `innerHTML`: the nodes DOMPurify checked are the ones rendered, with no serialize and re-parse for mutation XSS to exploit. Its value is an HTML string or `{ html, search? }` (`SafeHtmlValue`); a `search` term is highlighted by `markTextNodes` (`src/util/mark-text-nodes.ts`): the raw term, case-insensitive, wrapped in `<mark>` in text nodes only, skipping `<style>`. An object value is a new object on every render, so the directive compares `html` and `search` field by field and skips the update only when both match
 - `ConsoleItem` renders a `response` as HTML only when `hasRenderableHtml` finds markup DOMPurify keeps, so macros can output `<img>` and `<video>`; anything else is escaped with `escapeHtml` and gets command links if it is a `response`. The check sanitizes the message and looks for a surviving element, behind a `/<[a-z]/i` pre-check so most lines skip DOMPurify. So `<none>`, `<x>`, `<temp>` or `Unknown algorithm <foo>` keep the message plain — this matters because Klipper sends a whole `help` listing as one entry, so one macro description such as `M163 [P<factor>]` used to cost every line its links. Limits: a placeholder named like a real tag (`<b>`, `<i>`, `<p>`, `<s>`, `<u>`) renders as HTML, and in a message with real markup any other `<word>` is still dropped. Stored messages stay raw, so console filters are unaffected. Search passes `{ html, search }` to `v-safe-html`, so tags, attributes and entities can't be hit, plain-text and HTML messages match alike, and a match can't span two elements (such as the `$ ` prefix and the command link). `itemClick` resolves a click on a `<mark>` to its parent anchor
