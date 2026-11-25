@@ -698,6 +698,7 @@ app:
       tool: Tool
       tune: Tune
     tooltip:
+      open_in_new_tab: Open in new tab
       browse_metrics: Browse available metrics
       estop: Emergency Stop
       exit_layout: Exit layout mode

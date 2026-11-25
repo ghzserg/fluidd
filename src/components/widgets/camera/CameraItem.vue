@@ -2,6 +2,7 @@
   <v-sheet
     :elevation="0"
     class="camera-container"
+    :class="{ 'camera-standalone': standalone }"
     v-on="$listeners"
   >
     <template v-if="cameraComponent">
@@ -82,10 +83,11 @@
     </div>
 
     <div
-      v-if="!fullscreen && (fullscreenMode === 'embed' || !rawCameraUrl) && camera.service !== 'device'"
+      v-if="!standalone"
       class="camera-fullscreen"
     >
       <router-link
+        v-if="!fullscreen && (fullscreenMode === 'embed' || !rawCameraUrl) && camera.service !== 'device'"
         :to="{
           name: 'camera',
           params: {
@@ -95,15 +97,25 @@
       >
         <v-icon>$fullScreen</v-icon>
       </router-link>
-    </div>
-    <div
-      v-else-if="rawCameraUrl"
-      class="camera-fullscreen"
-    >
       <a
+        v-else-if="rawCameraUrl"
         :href="rawCameraUrl"
         target="_blank"
         rel="noopener noreferrer"
+      >
+        <v-icon>$openInNew</v-icon>
+      </a>
+      <a
+        :href="$router.resolve({
+          name: 'camera',
+          params: { cameraId: camera.uid },
+          query: { ...$route.query, standalone: '1' }
+        }).href"
+        :title="$t('app.general.tooltip.open_in_new_tab').toString()"
+        :aria-label="$t('app.general.tooltip.open_in_new_tab').toString()"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="ms-2"
       >
         <v-icon>$openInNew</v-icon>
       </a>
@@ -126,6 +138,10 @@ export default class CameraItem extends Vue {
 
   @Prop({ type: Boolean })
   readonly fullscreen?: boolean
+
+  get standalone (): boolean {
+    return !!this.fullscreen && this.$route.query.standalone === '1'
+  }
 
   @Prop({ type: String })
   readonly crossorigin?: 'anonymous' | 'use-credentials' | ''
@@ -206,6 +222,26 @@ export default class CameraItem extends Vue {
     position: relative;
     background: rgba(0, 0, 0, 1);
     min-height: 70px;
+  }
+
+  .camera-standalone {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+
+    .camera-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    iframe.camera-image {
+      height: auto;
+    }
   }
 
   .camera-name,

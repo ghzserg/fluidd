@@ -3,16 +3,19 @@
     class="fluidd"
     :class="{ 'no-pointer-events': dragState }"
   >
-    <app-tools-drawer v-model="toolsdrawer" />
-    <app-nav-drawer v-model="navdrawer" />
+    <template v-if="!standaloneView">
+      <app-tools-drawer v-model="toolsdrawer" />
+      <app-nav-drawer v-model="navdrawer" />
+    </template>
 
     <inline-svg
-      v-if="showBackgroundLogo && !isMobileViewport"
+      v-if="!standaloneView && showBackgroundLogo && !isMobileViewport"
       :src="logoSrc"
       class="background-logo"
     />
 
     <app-bar
+      v-if="!standaloneView"
       @toolsdrawer="handleToolsDrawerChange"
       @navdrawer="handleNavDrawerChange"
     />
@@ -26,7 +29,7 @@
     />
 
     <v-btn
-      v-if="isMobileViewport && socketReady"
+      v-if="(isMobileViewport || standaloneView) && socketReady"
       fab
       fixed
       bottom
@@ -46,8 +49,9 @@
       <v-container
         v-if="socketReady"
         fluid
-        :class="[['single', 'double', 'triple', 'quad'][columnCount - 1]]"
-        class="constrained-width pa-2 pa-sm-4"
+        :class="standaloneView ? 'pa-0' : [
+          'constrained-width', 'pa-2', 'pa-sm-4', ['single', 'double', 'triple', 'quad'][columnCount - 1]
+        ]"
       >
         <v-row v-if="(!klippyReady || hasWarnings) && !inLayout">
           <v-col>
@@ -94,7 +98,7 @@
       </template>
     </v-main>
 
-    <app-footer />
+    <app-footer v-if="!standaloneView" />
 
     <app-drag-overlay
       v-model="dragState"
@@ -153,6 +157,11 @@ export default class App extends Mixins(StateMixin, FilesMixin, BrowserMixin) {
     open: false,
     text: undefined,
     type: undefined
+  }
+
+  get standaloneView (): boolean {
+    return this.socketReady && this.$route.query.standalone === '1' &&
+      (this.$route.name === 'camera' || this.$route.name === 'gcode_preview')
   }
 
   get theme (): ThemeConfig {

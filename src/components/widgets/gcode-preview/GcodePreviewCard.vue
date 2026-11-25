@@ -5,9 +5,10 @@
     :draggable="!fullscreen"
     :collapsable="!fullscreen"
     layout-path="dashboard.gcode-preview-card"
+    :class="{ 'standalone-preview-card': standalone }"
   >
     <template #menu>
-      <app-btn-collapse-group :collapsed="narrow">
+      <app-btn-collapse-group :collapsed="narrow || (standalone && $vuetify.breakpoint.xsOnly)">
         <app-btn
           :disabled="!printerFile || printerFileLoaded"
           small
@@ -27,6 +28,22 @@
         >
           <v-icon dense>
             $fullScreen
+          </v-icon>
+        </app-btn>
+        <app-btn
+          v-if="!standalone"
+          icon
+          :href="$router.resolve({
+            name: 'gcode_preview',
+            query: { ...$route.query, standalone: '1' }
+          }).href"
+          :title="$t('app.general.tooltip.open_in_new_tab').toString()"
+          :aria-label="$t('app.general.tooltip.open_in_new_tab').toString()"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <v-icon dense>
+            $openInNew
           </v-icon>
         </app-btn>
       </app-btn-collapse-group>
@@ -164,6 +181,10 @@ export default class GcodePreviewCard extends Mixins(StateMixin, FilesMixin, Bro
 
   @Prop({ type: Boolean })
   readonly fullscreen?: boolean
+
+  get standalone (): boolean {
+    return !!this.fullscreen && this.$route.query.standalone === '1'
+  }
 
   @Ref('preview')
   readonly preview!: GcodePreview
@@ -398,6 +419,8 @@ export default class GcodePreviewCard extends Mixins(StateMixin, FilesMixin, Bro
   }
 
   get autoLoadOnPrintStart (): boolean {
+    if (this.standalone) return true
+
     if (this.isMobileViewport) {
       return this.$typedState.config.uiSettings.gcodePreview.autoLoadMobileOnPrintStart
     }
@@ -457,6 +480,10 @@ export default class GcodePreviewCard extends Mixins(StateMixin, FilesMixin, Bro
   }
 
   created () {
+    if (this.standalone && (this.printerPrinting || this.printerPaused) && !this.printerFileLoaded) {
+      this.loadCurrent()
+    }
+
     if (this.followProgress) {
       this.currentLayer = this.fileProgressLayerNr
       this.syncMoveProgress()
@@ -466,3 +493,17 @@ export default class GcodePreviewCard extends Mixins(StateMixin, FilesMixin, Bro
   }
 }
 </script>
+
+<style lang="scss" scoped>
+  .standalone-preview-card :deep(.gcode-preview .app-focusable-container__slot) {
+    aspect-ratio: auto;
+    max-height: none;
+    height: max(250px, calc(100vh - 255px));
+    height: max(250px, calc(100dvh - 255px));
+
+    @media (max-width: 959px) {
+      height: max(250px, calc(100vh - 340px));
+      height: max(250px, calc(100dvh - 340px));
+    }
+  }
+</style>
